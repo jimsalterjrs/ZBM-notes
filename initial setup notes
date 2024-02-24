@@ -15,7 +15,7 @@ sgdisk -n "2:0:-10m" -t "2:bf00" "$DISK"
 # if you want to go with an mdraid array, go ahead and create that now.
 # that will look something like this:
 #
-# mdadm --create /dev/md0 -l1 -n2 /dev/$DISK1 /dev/$DISK2 ...
+# mdadm --create /dev/md0 -l1 -n2 --metadata=1.0 /dev/$firstDISK1 /dev/$secondDISK1 ...
 
 # now, the rest of these steps reference either /dev/md0 or /dev/$DISK1
 # (the first partition on /dev/$DISK, that is) depending on whether you're
