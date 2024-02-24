@@ -40,7 +40,6 @@ echo "/dev/md0 /boot/efi vfat defaults 0 0" >> /etc/fstab
 # under /mnt instead.
 
 mount /boot/efi
-mkdir -p /boot/efi/EFI/BOOT
 
 # This part is crucial for the majority of motherboards I've encountered.
 # The standard ZBM install instructions tell you to create alternate
@@ -48,7 +47,14 @@ mkdir -p /boot/efi/EFI/BOOT
 # do detect and boot from them. But every consumer mobo I've tried so far
 # refuses to recognize any UEFI bootable not stored at EFI/BOOT/BOOTX64.EFI
 # on the UEFI bootable filesystem.
+#
+# I strongly recommend not putting ANY other files in this UEFI filesystem.
+# It's been my experience that a depressing number of mobos not only refuse
+# to boot to anywhere but EFI\BOOT\BOOTX64.EXE on a VFAT filesystem, they
+# will also refuse to boot if they find anything *else* (like an earlier 
+# attempt to follow the generic ZBM install instructions) on that filesystem.
 
+mkdir -p /boot/efi/EFI/BOOT
 wget -o /boot/efi/EFI/BOOT/BOOTX64.EFI https://get.zfsbootmenu.org/efi
 
 # For the vast majority of folks, you should be done and ready to create
@@ -74,6 +80,9 @@ wget -o /boot/efi/EFI/BOOT/BOOTX64.EFI https://get.zfsbootmenu.org/efi
 # motherboard's UEFI settings this way--you only need the first line (there is
 # no "backup partition"), and just make it say /dev/md0 instead of referring to
 # any single disk partition *inside* the mdraid1 array.
+# 
+# Again, do NOT forget to get rid of ANY data other than EFI/BOOT/BOOTX64.EFI
+# on your UEFI boot filesystem!
 
 efibootmgr -c -d /dev/$FIRSTDISK1 -p1 -L "ZFSBootMenu" -l '\EFI\BOOT\BOOTX64.EFI'
 efibootmgr -c -d /dev/$SECONDDISK1 -p1 -L "ZFSBootMenu (recovery boot disk)" -l '\EFI\BOOT\BOOTX64.EFI'
