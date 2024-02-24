@@ -1,0 +1,79 @@
+# this destroys all partitions on $DISK, then creates a 1G UEFI partition
+# and a second partition which uses the remaining space on the disk.
+#
+# partition types created are mdraid (UEFI boot part) and Solaris ZFS.
+#
+# adjust the UEFI boot part type to 3f00 if you want to boot from a FAT32
+# filesystem mounted directly on that single partition, rather than an
+# eventual mdraid1 mirror making the first partition on *multiple* drives
+# bootable.
+
+sgdisk --zap-all $DISK
+sgdisk -n "1:1m:+1g" -t "1:fd00" "$DISK"
+sgdisk -n "2:0:-10m" -t "2:bf00" "$DISK"
+
+# if you want to go with an mdraid array, go ahead and create that now.
+# that will look something like this:
+#
+# mdadm --create /dev/md0 -l1 -n2 /dev/$DISK1 /dev/$DISK2 ...
+
+# now, the rest of these steps reference either /dev/md0 or /dev/$DISK1
+# (the first partition on /dev/$DISK, that is) depending on whether you're
+# going direct-boot from a single partition, or boot from mdraid.
+#
+# I'm going to assume you want to use mdraid.
+
+mkfs.vfat -F32 /dev/md0
+
+# This part needs to either be run on an existing system, or inside 
+# the chroot of the system you're building. Note that if you get this
+# wrong--eg by referring to /dev/md0 on a system which needs to boot
+# directly from a single partition UEFI filesystem--you will make
+# your system unbootable until you correct or remove the offending
+# fstab entry. You don't actually need this fstab entry to boot the
+# system at all--you just need it for apt or similar tools to be able to 
+# *find* your UEFI boot partition in order to update it later.
+
+echo "/dev/md0 /boot/efi vfat defaults 0 0" >> /etc/fstab
+
+# If you're not running inside a chroot, just mount /dev/md0 or /dev/sd$DISK1
+# under /mnt instead.
+
+mount /boot/efi
+mkdir -p /boot/efi/EFI/BOOT
+
+# This part is crucial for the majority of motherboards I've encountered.
+# The standard ZBM install instructions tell you to create alternate
+# ZBM-specific directory names, and some newer server-grade motherboards
+# do detect and boot from them. But every consumer mobo I've tried so far
+# refuses to recognize any UEFI bootable not stored at EFI/BOOT/BOOTX64.EFI
+# on the UEFI bootable filesystem.
+
+wget -o /boot/efi/EFI/BOOT/BOOTX64.EFI https://get.zfsbootmenu.org/efi
+
+# For the vast majority of folks, you should be done and ready to create
+# your pool, install an OS onto that pool via chroot (or replicate an
+# already-installed one in from elsewhere), and reboot into it.
+#
+# If you already did all that and your system won't boot... read on.
+#
+# This step is hopefully not necessary for the vast majority of motherboards,
+# but if you've got a particularly stupid one you can use the efibootmgr tool
+# to attempt to manually, forcibly insert boot options into your mobo's UEFI
+# settings, even when the actual UEFI firmware UI is too broken or stupid to
+# let you do so there.
+#
+# If you actually need to perform these steps, you have my sympathy, because
+# friend: I've been there.
+#
+# In these examples, we are booting from a single partition (not an mdraid1)
+# and we've got one that we expect to use normally, and another that's
+# normally never used, but *available* should something go wrong with the first.
+#
+# If you're booting from an mdraid1 array, and you need to mess with your
+# motherboard's UEFI settings this way--you only need the first line (there is
+# no "backup partition"), and just make it say /dev/md0 instead of referring to
+# any single disk partition *inside* the mdraid1 array.
+
+efibootmgr -c -d /dev/$FIRSTDISK1 -p1 -L "ZFSBootMenu" -l '\EFI\BOOT\BOOTX64.EFI'
+efibootmgr -c -d /dev/$SECONDDISK1 -p1 -L "ZFSBootMenu (recovery boot disk)" -l '\EFI\BOOT\BOOTX64.EFI'
